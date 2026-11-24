@@ -1,0 +1,152 @@
+services:
+  kc-postgres:
+    image: public.ecr.aws/docker/library/postgres:18
+    container_name: kc-postgres
+    restart: unless-stopped
+ 
+    # Resource limits
+    mem_limit: 160m
+    cpus: "0.20"
+    pids_limit: 60
+ 
+    environment:
+      POSTGRES_USER: kcuser
+      POSTGRES_PASSWORD: "123"          # CHANGE ME
+      POSTGRES_DB: kc
+ 
+    command:
+      - postgres
+      - -c
+      - shared_buffers=16MB
+      - -c
+      - effective_cache_size=64MB
+      - -c
+      - work_mem=1MB
+      - -c
+      - maintenance_work_mem=8MB
+      - -c
+      - max_connections=15
+      - -c
+      - max_worker_processes=2
+      - -c
+      - max_parallel_workers=0
+      - -c
+      - max_parallel_workers_per_gather=0
+      - -c
+      - autovacuum_max_workers=1
+      - -c
+      - max_wal_size=128MB
+ 
+    ports:
+      - "127.0.0.1:30001:5432"
+ 
+    volumes:
+      - pgdata18:/var/lib/postgresql
+ 
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U kcuser -d kc
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+ 
+    networks:
+      - kc_network
+ 
+ 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    container_name: rhbk
+    restart: unless-stopped
+ 
+    # Resource limits
+    mem_limit: 640m
+    cpus: "0.75"
+    pids_limit: 150
+ 
+    depends_on:
+      kc-postgres:
+        condition: service_healthy
+ 
+    # Keycloak is reachable publicly through HAProxy.
+    # Do not expose 9443 directly to the Internet.
+    ports:
+      - "127.0.0.1:9443:9443"
+ 
+    environment:
+      # Bootstrap admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "12345678"   # CHANGE ME
+ 
+      # PostgreSQL
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://kc-postgres:5432/kc
+      KC_DB_USERNAME: kcuser
+      KC_DB_PASSWORD: "123"                     # CHANGE ME
+ 
+      # Small connection pool
+      KC_DB_POOL_INITIAL_SIZE: "1"
+      KC_DB_POOL_MIN_SIZE: "1"
+      KC_DB_POOL_MAX_SIZE: "5"
+ 
+      # Public/external Keycloak URL
+      KC_HOSTNAME: "https://keycloak.<>.com"
+      KC_HOSTNAME_STRICT: "true"
+ 
+      # HTTPS only
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_PORT: "9443"
+ 
+      # TLS certificate inside container
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/server.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/server.key
+ 
+      # Lightweight configuration
+      KC_HEALTH_ENABLED: "false"
+      KC_METRICS_ENABLED: "false"
+      KC_CACHE: local
+ 
+      # Logging
+      KC_LOG_LEVEL: WARN
+ 
+      # JVM memory
+      JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx320m"
+ 
+    volumes:
+      # Let's Encrypt certificate copied to these host paths
+      - type: bind
+        source: /opt/keycloak/server.crt
+        target: /opt/keycloak/certs/server.crt
+        read_only: true
+        bind:
+          create_host_path: false
+ 
+      - type: bind
+        source: /opt/keycloak/server.key
+        target: /opt/keycloak/certs/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+ 
+      # Custom themes
+      - /opt/keycloak/themes:/opt/keycloak/themes:ro
+ 
+      # Custom CAPTCHA provider
+      - /opt/keycloak/providers/keycloak-captcha.jar:/opt/keycloak/providers/keycloak-captcha.jar:ro
+ 
+    command:
+      - start
+ 
+    networks:
+      - kc_network
+ 
+ 
+volumes:
+  pgdata18:
+ 
+ 
+networks:
+  kc_network:
+    driver: bridge
