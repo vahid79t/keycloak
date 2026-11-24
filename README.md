@@ -7,7 +7,7 @@ Deploys Keycloak 26.7.0 with PostgreSQL 18 using Docker Compose, in a low-resour
 ```
 Browser / kubectl
         ↓
-https://keycloak.tokeli.ir
+https://keycloak.<>.com
         ↓
 HAProxy :443
         ↓
@@ -21,7 +21,7 @@ Keycloak :9443
 - Docker and Docker Compose
 - HAProxy installed on the host
 - `certbot` installed on the host
-- DNS A record for `keycloak.tokeli.ir` pointing to the server
+- DNS A record for `keycloak.<>.com` pointing to the server
 - Port 80 free temporarily (for the standalone certificate challenge)
 ## 1. Issue the Let's Encrypt certificate
  
@@ -32,7 +32,7 @@ systemctl stop haproxy
  
 ss -lntp | grep ':80 '
  
-dig +short keycloak.tokeli.ir
+dig +short keycloak.<>.com
 ```
  
 Request the certificate:
@@ -40,7 +40,7 @@ Request the certificate:
 ```bash
 certbot certonly \
   --standalone \
-  -d keycloak.tokeli.ir \
+  -d keycloak.<>.com \
   --email YOUR_REAL_EMAIL \
   --agree-tos \
   --no-eff-email
@@ -50,8 +50,8 @@ Resulting files:
  
 | Item        | Path                                                      |
 |-------------|-----------------------------------------------------------|
-| Certificate | `/etc/letsencrypt/live/keycloak.tokeli.ir/fullchain.pem`  |
-| Private key | `/etc/letsencrypt/live/keycloak.tokeli.ir/privkey.pem`    |
+| Certificate | `/etc/letsencrypt/live/keycloak.<>.com/fullchain.pem`  |
+| Private key | `/etc/letsencrypt/live/keycloak.<>.com/privkey.pem`    |
  
 Start HAProxy again:
  
@@ -158,7 +158,7 @@ services:
       KC_DB_POOL_MAX_SIZE: "5"
  
       # Public/external Keycloak URL
-      KC_HOSTNAME: "https://keycloak.tokeli.ir"
+      KC_HOSTNAME: "https://keycloak.<>.com"
       KC_HOSTNAME_STRICT: "true"
  
       # HTTPS only
@@ -223,10 +223,10 @@ networks:
 Copy the Let's Encrypt files (dereferencing symlinks) to the paths mounted by the container and set permissions:
  
 ```bash
-cp -L /etc/letsencrypt/live/keycloak.tokeli.ir/fullchain.pem \
+cp -L /etc/letsencrypt/live/keycloak.<>.com/fullchain.pem \
   /opt/keycloak/server.crt
  
-cp -L /etc/letsencrypt/live/keycloak.tokeli.ir/privkey.pem \
+cp -L /etc/letsencrypt/live/keycloak.<>.com/privkey.pem \
   /opt/keycloak/server.key
  
 chmod 644 /opt/keycloak/server.crt
